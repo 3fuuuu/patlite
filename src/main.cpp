@@ -1,126 +1,167 @@
 #include <Arduino.h>
-#include <WiFi.h>                                             // Wifi制御用ライブラリ
-#include <stdio.h>                                            // 標準入出力処理ライブラリ
+#include <WiFi.h>
+#include <stdio.h>
 
 // ------------------------------------------------------------
-// 定数/変数　定義部　Constant / variable definition section.
-// ------------------------------------------------------------ 
-const char* ssid = "";                               // ご自分のWi-FiルータのSSIDを記述します。 "your-ssid"
-const char* password = "";                       // ご自分のWi-Fiルータのパスワードを記述します。"your-password"
+// Wi-Fi設定
+// ------------------------------------------------------------
+const char* ssid = "";
+const char* password = "";
 
-const int RED = 16;
-const int RED2 = 17;
-const int YELLOW = 0;
-const int YELLOW2 = 1;
-const int GREEN = 2;
-const int GREEN2 = 3;
+// ------------------------------------------------------------
+// ピン定義
+// ------------------------------------------------------------
+const int RED        = 16;
+const int RED2       = 17;
+const int YELLOW     = 0;
+const int YELLOW2    = 1;
+const int GREEN      = 2;
+const int GREEN2     = 3;
 const int SOUND_FAST = 4;
 const int SOUND_SLOW = 5;
 
-int port = 80;                                                // Http接続に使うポート番号の設定
-
-WiFiServer server(port);                                      // WiFiサーバーの生成
-
-const long TIMEOUT_TIME = 2000;                               // タイムアウト時間の定義（2s=2000ms) Definition of timeout time (2s = 2000ms).
-String Header;                                                // HTTPリクエストの格納用 For storing HTTP requests
-unsigned long CurrentTime = millis();                         // 現在時刻格納用 For storing the current time.
-unsigned long PreviousTime = 0;                               // 前の時刻格納用 For storing the previous time.
+// ------------------------------------------------------------
+// サーバ
+// ------------------------------------------------------------
+WiFiServer server(80);
+const uint32_t TIMEOUT_MS = 2000;
 
 // ------------------------------------------------------------
-// Webリクエスト応答関数
-// Run_WEB()
+// State（状態だけ持つ）
 // ------------------------------------------------------------
-void Run_WEB() {
-  WiFiClient client = server.available();                     // Listen for incoming clients
+struct State {
+  bool red = false;
+  bool red2 = false;
+  bool yellow = false;
+  bool yellow2 = false;
+  bool green = false;
+  bool green2 = false;
+  bool sound_fast = false;
+  bool sound_slow = false;
+};
 
-  if (client) {                                               // 新しいクライアント接続がある場合に以下を実行
-    CurrentTime = millis();                                   // 現在時刻の取得
-    PreviousTime = CurrentTime;                               // 前回時刻への現在時刻の格納
+State st;
 
-    // for debug
-    // Serial.println("New Client.");                         // デバッグ用シリアルに表示
+static const char* onoff(bool v) { return v ? "ON" : "OFF"; }
 
-    String _CurrentLine = "";                                 // クライアントからの受信データを保持する文字列の生成
-    while (client.connected() && CurrentTime - PreviousTime <= TIMEOUT_TIME) {  // クライアントが接続している間繰り返し実行する
-      CurrentTime = millis();                                 // 現在時刻の更新
-      if (client.available()) {                               // クライアントから読み取る情報（バイト）がある場合
-        char _c = client.read();                              // 値（バイト）を読み取り
+void httpState() {
+  digitalWrite(RED,        st.red        ? HIGH : LOW);
+  digitalWrite(RED2,       st.red2       ? HIGH : LOW);
+  digitalWrite(YELLOW,     st.yellow     ? HIGH : LOW);
+  digitalWrite(YELLOW2,    st.yellow2    ? HIGH : LOW);
+  digitalWrite(GREEN,      st.green      ? HIGH : LOW);
+  digitalWrite(GREEN2,     st.green2     ? HIGH : LOW);
+  digitalWrite(SOUND_FAST, st.sound_fast ? HIGH : LOW);
+  digitalWrite(SOUND_SLOW, st.sound_slow ? HIGH : LOW);
+}
+void setByKey(const String& header, const char* key, bool& value) {
+  String k1 = String(key) + "=1";
+  String k0 = String(key) + "=0";
+  if (header.indexOf(k1) >= 0) value = true;
+  if (header.indexOf(k0) >= 0) value = false;
+}
 
-        // for debug
-        // Serial.write(_c);                                  // デバッグ用シリアルに表示
+void updateState(const String& header) {
+  setByKey(header, "red",        st.red);
+  setByKey(header, "red2",       st.red2);
+  setByKey(header, "yellow",     st.yellow);
+  setByKey(header, "yellow2",    st.yellow2);
+  setByKey(header, "green",      st.green);
+  setByKey(header, "green2",     st.green2);
+  setByKey(header, "sound_fast", st.sound_fast);
+  setByKey(header, "sound_slow", st.sound_slow);
 
-        Header += _c;                                         // リクエストに値（バイト）を格納
-        if (_c == '\n') {                                     // 値が改行文字の場合に以下を実行
-          //現在の行が空白の場合、2つの改行文字が連続して表示
-          //クライアントのHTTPリクエストは終了であるため、応答を送信
-          if (_CurrentLine.length() == 0) {
-            int pos1 = 0;
-            int pos2 = 0;
-
-            // Header String から各閾値を取得し、変数に格納
-            pos1 = Header.indexOf("massaget=", pos2);
-            pos2 = Header.indexOf(" ", pos1);
-            
-            // 受信したメッセージをシリアルモニタに表示する
-            String mes_str =  Header.substring(pos1 + 9, pos2); // 受信したテキストからメッセージを抽出
-            mes_str.replace("+", " ");
-            if (mes_str.length() <= 32) {                       // テキストの長さがcharの大きさよりも小さい場合に実行
-              char buf[64];
-              char mes_text[32];
-              mes_str.toCharArray(mes_text, 32);
-              sprintf(buf, "Send Message : %s", mes_text);
-              Serial.println(buf);
-            }
-          
-            // HTTPヘッダーは常に応答コードで始まる（例：HTTP/1.1 200 OK)
-            // Content-typeでクライアントが何が来るのか知ることができその後空白行になる
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-
-            // HTML Webページの表示
-            client.println("<!DOCTYPE html><html>");
-            client.println("<html lang=\"ja\">");
-            client.println("<head><meta charset=\"UTF-8\" name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<title>KARAKURI-MUSHA -Http connect test- </title>");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-
-            // CSSのスタイルの指定
-            client.println("<style>");
-            client.println("html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".btn_1 {background-color: #e64e20; border: none; color: white; padding: 16px 40px;text-decoration: none; font-size: 15px; margin: 2px; cursor: pointer;border-radius: 100vh;width: 150px;}");
-            client.println("</style></head>");
-
-            // Webページ本体(タイトルと説明)
-            client.println("<body><h3>KARAKURI-MUSHA</h3>");
-            client.println("<h3>- Http 接続テスト-</h3>");
-            client.println("<form action=\"MESSAGEQ\" name=\"massageq\" method=\"get\">");
-            client.println("<input type=\"text\" name=\"massaget\">");
-            client.println("<p ><input type=\"submit\" value=\"SEND\" class=\"btn_1\"></a></p></form>");
-
-            // 本文末
-            client.println("</body></html>");
-            // HTTP応答は別の空白行で終了
-            client.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            _CurrentLine = "";
-          }
-        } else if (_c != '\r') {  // if you got anything else but a carriage return character,
-          _CurrentLine += _c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    Header = "";
-    client.flush();
+  if (header.indexOf("all=0") >= 0) {
+    st = State{}; 
   }
 }
 
-void setup() {
+String makeHtml() {
+  String html = R"HTML(
+<!doctype html><html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>patlite ぴかぴか</title>
+<style>
+  body{font-family:Helvetica;max-width:560px;margin:0 auto;text-align:center}
+  .card{border:1px solid #ccc;border-radius:10px;padding:10px;margin:12px}
+  .row{margin:10px 0}
+  a.btn{display:inline-block;min-width:120px;padding:12px 14px;margin:6px;
+        background:#1e88e5;color:#fff;text-decoration:none;border-radius:999px;font-weight:bold}
+  a.off{background:#616161}
+</style></head><body>
+<h3>KARAKURI-MUSHA</h3>
+<h3>- patlite ぴかぴか -</h3>
+)HTML";
 
+  html += "<div class='card'>";
+  html += "RED: " + String(onoff(st.red)) + " / RED2: " + String(onoff(st.red2)) + "<br>";
+  html += "YELLOW: " + String(onoff(st.yellow)) + " / YELLOW2: " + String(onoff(st.yellow2)) + "<br>";
+  html += "GREEN: " + String(onoff(st.green)) + " / GREEN2: " + String(onoff(st.green2)) + "<br>";
+  html += "SOUND_FAST: " + String(onoff(st.sound_fast)) + " / SOUND_SLOW: " + String(onoff(st.sound_slow)) + "<br>";
+  html += "</div>";
+
+  auto row = [&](const char* label, const char* key){
+    html += "<div class='row'><strong>";
+    html += label;
+    html += "</strong><br>";
+    html += "<a class='btn' href='/?";
+    html += key;
+    html += "=1'>ON</a>";
+    html += "<a class='btn off' href='/?";
+    html += key;
+    html += "=0'>OFF</a></div>";
+  };
+
+  row("RED", "red");
+  row("RED2", "red2");
+  row("YELLOW", "yellow");
+  row("YELLOW2", "yellow2");
+  row("GREEN", "green");
+  row("GREEN2", "green2");
+  row("SOUND_FAST", "sound_fast");
+  row("SOUND_SLOW", "sound_slow");
+
+  html += "<div class='row'><a class='btn off' href='/?all=0'>ALL OFF</a></div>";
+  html += "</body></html>";
+  return html;
+}
+
+void handleClientOnce() {
+  WiFiClient client = server.available();
+  if (!client) return;
+
+  uint32_t start = millis();
+  String header;
+  String line;
+
+  while (client.connected() && (millis() - start) < TIMEOUT_MS) {
+    if (!client.available()) continue;
+
+    char c = client.read();
+    header += c;
+
+    if (c == '\n') {
+      if (line.length() == 0) break; // 空行＝ヘッダ終端
+      line = "";
+    } else if (c != '\r') {
+      line += c;
+    }
+  }
+
+  updateState(header);
+
+  // レスポンス
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-type:text/html; charset=utf-8");
+  client.println("Connection: close");
+  client.println();
+  client.print(makeHtml());
+  client.println();
+
+  client.stop();
+}
+void setup() {
   pinMode(RED, OUTPUT);
   pinMode(RED2, OUTPUT);
   pinMode(YELLOW, OUTPUT);
@@ -130,27 +171,27 @@ void setup() {
   pinMode(SOUND_FAST, OUTPUT);
   pinMode(SOUND_SLOW, OUTPUT);
 
-  
+  Serial.begin(115200);
+  delay(500);
 
-  // シリアルコンソールの開始　Start serial console.
-  Serial.begin(9600);
-  delay(3000);
-
- // WiFi.mode(WIFI_STA);
-  Serial.print("Connecting to '");
-  Serial.print(ssid);
-  Serial.println("'");
+  //WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+
+  Serial.print("Connecting");
   while (WiFi.status() != WL_CONNECTED) {
+    delay(250);
     Serial.print(".");
-    delay(100);
   }
-    Serial.println("\nConnected to WiFi\n\nConnect to server at %s:%d\n");
-    Serial.print(WiFi.localIP().toString().c_str());
-    Serial.print(port);
+  Serial.println("\nConnected");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
 
   server.begin();
+
+  httpState();
 }
+
 void loop() {
-  Run_WEB();
+  handleClientOnce();
+  httpState();
 }
