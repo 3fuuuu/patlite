@@ -39,72 +39,72 @@ const char HTML_PAGE[] = R"HTML(
 <!DOCTYPE html><html lang="jp"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>REMOTE-CONTROLLER</title>
-  <style>
-    body{font-family:sans-serif;background:#fff;max-width:520px;margin:0 auto;text-align:center;}
-    h1{color:#333;font-size:26px;margin:12px auto;}
-    .row{display:flex;justify-content:center;gap:10px;margin:10px 0;flex-wrap:wrap;}
-    .btn{height:56px;min-width:120px;color:#2c2b2b;background:#dddde9;font-size:16px;font-weight:bold;border-radius:10px;border:0;}
-    .title{min-width:120px;font-weight:bold}
-    table{margin:10px auto;border-collapse:collapse}
-    td{border:1px solid #999;padding:8px 10px}
-  </style></head><body>
-    <h1>patliteぴかぴか</h1>
+<style>
+  body{font-family:sans-serif;background:#fff;max-width:520px;margin:0 auto;text-align:center;}
+  h1{color:#333;font-size:26px;margin:12px auto;}
+  .row{display:flex;justify-content:center;gap:10px;margin:10px 0;flex-wrap:wrap;align-items:center;}
+  .title{min-width:120px;font-weight:bold}
 
-    <div class="row"><div class="title">RED</div>
-      <button class="btn" onclick="send('red_on')">ON</button>
-      <button class="btn" onclick="send('red_off')">OFF</button>
-      <div id="st_red">?</div>
-    </div>
+  .btn{height:56px;min-width:120px;font-size:16px;font-weight:bold;border-radius:10px;border:0;cursor:pointer}
+  .btn-red{background:#e53935;color:#fff;}
+  .btn-yellow{background:#fdd835;color:#222;}
+  .btn-green{background:#43a047;color:#fff;}
+  .btn-gray{background:#616161;color:#fff;}
 
-    <div class="row"><div class="title">RED2</div>
-      <button class="btn" onclick="send('red2_on')">ON</button>
-      <button class="btn" onclick="send('red2_off')">OFF</button>
-      <div id="st_red2">?</div>
-    </div>
+  td{width:110px;color:#333;text-align:center;font-size:18px;}
+</style>
 
-    <div class="row"><div class="title">YELLOW</div>
-      <button class="btn" onclick="send('yellow_on')">ON</button>
-      <button class="btn" onclick="send('yellow_off')">OFF</button>
-      <div id="st_yellow">?</div>
-    </div>
+<div class="row"><div class="title">RED</div>
+  <button class="btn btn-red" onclick="send('red_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('red_off')">OFF</button>
+  <div id="st_red">?</div>
+</div>
 
-    <div class="row"><div class="title">YELLOW2</div>
-      <button class="btn" onclick="send('yellow2_on')">ON</button>
-      <button class="btn" onclick="send('yellow2_off')">OFF</button>
-      <div id="st_yellow2">?</div>
-    </div>
+<div class="row"><div class="title">RED2</div>
+  <button class="btn btn-red" onclick="send('red2_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('red2_off')">OFF</button>
+  <div id="st_red2">?</div>
+</div>
 
-    <div class="row"><div class="title">GREEN</div>
-      <button class="btn" onclick="send('green_on')">ON</button>
-      <button class="btn" onclick="send('green_off')">OFF</button>
-      <div id="st_green">?</div>
-    </div>
+<div class="row"><div class="title">YELLOW</div>
+  <button class="btn btn-yellow" onclick="send('yellow_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('yellow_off')">OFF</button>
+  <div id="st_yellow">?</div>
+</div>
 
-    <div class="row"><div class="title">GREEN2</div>
-      <button class="btn" onclick="send('green2_on')">ON</button>
-      <button class="btn" onclick="send('green2_off')">OFF</button>
-      <div id="st_green2">?</div>
-    </div>
+<div class="row"><div class="title">YELLOW2</div>
+  <button class="btn btn-yellow" onclick="send('yellow2_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('yellow2_off')">OFF</button>
+  <div id="st_yellow2">?</div>
+</div>
 
-    <div class="row"><div class="title">SOUND_FAST</div>
-      <button class="btn" onclick="send('sfast_on')">ON</button>
-      <button class="btn" onclick="send('sfast_off')">OFF</button>
-      <div id="st_sfast">?</div>
-    </div>
+<div class="row"><div class="title">GREEN</div>
+  <button class="btn btn-green" onclick="send('green_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('green_off')">OFF</button>
+  <div id="st_green">?</div>
+</div>
 
-    <div class="row"><div class="title">SOUND_SLOW</div>
-      <button class="btn" onclick="send('sslow_on')">ON</button>
-      <button class="btn" onclick="send('sslow_off')">OFF</button>
-      <div id="st_sslow">?</div>
-    </div>
+<div class="row"><div class="title">GREEN2</div>
+  <button class="btn btn-green" onclick="send('green2_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('green2_off')">OFF</button>
+  <div id="st_green2">?</div>
+</div>
 
-    <div class="row">
-      <button class="btn" onclick="send('all_off')">ALL OFF</button>
-    </div>
+<div class="row"><div class="title">SOUND_FAST</div>
+  <button class="btn btn-gray" onclick="send('sfast_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('sfast_off')">OFF</button>
+  <div id="st_sfast">?</div>
+</div>
 
-    <table>
-      <tr><td>状態(まとめ)</td><td><pre id="all"></pre></td></tr>
-    </table>
+<div class="row"><div class="title">SOUND_SLOW</div>
+  <button class="btn btn-gray" onclick="send('sslow_on')">ON</button>
+  <button class="btn btn-gray" onclick="send('sslow_off')">OFF</button>
+  <div id="st_sslow">?</div>
+</div>
+
+<div class="row">
+  <button class="btn btn-gray" onclick="send('all_off')">ALL OFF</button>
+</div>
 
   <script type="text/javascript">
     async function send(cmd){
@@ -115,7 +115,7 @@ const char HTML_PAGE[] = R"HTML(
       try{
         const r = await fetch("/?cmd=status");
         if(!r.ok) return;
-        const t = await r.text(); // 例: red=1&red2=0&...
+        const t = await r.text(); 
         document.getElementById("all").textContent = t;
 
         document.getElementById("st_red").textContent     = t.includes("red=1") ? "ON" : "OFF";
@@ -153,7 +153,7 @@ void Run_WEB() {
 
     if (c == '\n') {
       if (currentLine.length() == 0) {
-        // ===== ここでコマンド判定（初心者向けにifを並べる） =====
+        
         if (Header.indexOf("GET /?cmd=red_on") >= 0)      stRED = true;
         if (Header.indexOf("GET /?cmd=red_off") >= 0)     stRED = false;
 
@@ -188,8 +188,14 @@ void Run_WEB() {
           client.println("Content-type:text/plain; charset=utf-8");
           client.println("Connection: close");
           client.println();
-          client.printf("red=%d&red2=%d&yellow=%d&yellow2=%d&green=%d&green2=%d&sfast=%d&sslow=%d",
-                        stRED, stRED2, stYELLOW, stYELLOW2, stGREEN, stGREEN2, stSFAST, stSSLOW);
+          client.print("red="); client.print(stRED);
+          client.print("&red2="); client.print(stRED2);
+          client.print("&yellow="); client.print(stYELLOW);
+          client.print("&yellow2="); client.print(stYELLOW2);
+          client.print("&green="); client.print(stGREEN);
+          client.print("&green2="); client.print(stGREEN2);
+          client.print("&sfast="); client.print(stSFAST);
+          client.print("&sslow="); client.print(stSSLOW);
           client.println();
           client.println();
           break;
@@ -228,16 +234,19 @@ void setup() {
   pinMode(SOUND_FAST, OUTPUT);
   pinMode(SOUND_SLOW, OUTPUT);
 
-  applyOutputs(); // 全部OFF
+  applyOutputs(); 
 
-  Serial.printf("Connecting to '%s' \n", ssid);
+  Serial.print("Connecting to '");
+  Serial.print(ssid);
+  Serial.println("'");
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(100);
   }
-  Serial.printf("\nConnected to WiFi\nIP: %s\n",
-                WiFi.localIP().toString().c_str());
+  Serial.println("\nConnected to WiFi");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
 
   server.begin();
 }
