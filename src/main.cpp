@@ -2,166 +2,223 @@
 #include <WiFi.h>
 #include <stdio.h>
 
-// ------------------------------------------------------------
-// Wi-Fi設定
-// ------------------------------------------------------------
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "your-ssid";
+const char* password = "your-password";
 
-// ------------------------------------------------------------
-// ピン定義
-// ------------------------------------------------------------
-const int RED        = 16;
-const int RED2       = 17;
-const int YELLOW     = 0;
-const int YELLOW2    = 1;
-const int GREEN      = 2;
-const int GREEN2     = 3;
+const int RED = 16;
+const int RED2 = 17;
+const int YELLOW = 0;
+const int YELLOW2 = 1;
+const int GREEN = 2;
+const int GREEN2 = 3;
 const int SOUND_FAST = 4;
 const int SOUND_SLOW = 5;
 
-// ------------------------------------------------------------
-// サーバ
-// ------------------------------------------------------------
 WiFiServer server(80);
-const uint32_t TIMEOUT_MS = 2000;
 
-// ------------------------------------------------------------
-// State（状態だけ持つ）
-// ------------------------------------------------------------
-struct State {
-  bool red = false;
-  bool red2 = false;
-  bool yellow = false;
-  bool yellow2 = false;
-  bool green = false;
-  bool green2 = false;
-  bool sound_fast = false;
-  bool sound_slow = false;
-};
+const long TIMEOUT_TIME = 2000;
+String Header;
+unsigned long CurrentTime = millis();
+unsigned long PreviousTime = 0;
 
-State st;
+bool stRED=false, stRED2=false, stYELLOW=false, stYELLOW2=false;
+bool stGREEN=false, stGREEN2=false, stSFAST=false, stSSLOW=false;
 
-static const char* onoff(bool v) { return v ? "ON" : "OFF"; }
-
-void httpState() {
-  digitalWrite(RED,        st.red        ? HIGH : LOW);
-  digitalWrite(RED2,       st.red2       ? HIGH : LOW);
-  digitalWrite(YELLOW,     st.yellow     ? HIGH : LOW);
-  digitalWrite(YELLOW2,    st.yellow2    ? HIGH : LOW);
-  digitalWrite(GREEN,      st.green      ? HIGH : LOW);
-  digitalWrite(GREEN2,     st.green2     ? HIGH : LOW);
-  digitalWrite(SOUND_FAST, st.sound_fast ? HIGH : LOW);
-  digitalWrite(SOUND_SLOW, st.sound_slow ? HIGH : LOW);
-}
-void setByKey(const String& header, const char* key, bool& value) {
-  String k1 = String(key) + "=1";
-  String k0 = String(key) + "=0";
-  if (header.indexOf(k1) >= 0) value = true;
-  if (header.indexOf(k0) >= 0) value = false;
+void applyOutputs() {
+  digitalWrite(RED, stRED ? HIGH : LOW);
+  digitalWrite(RED2, stRED2 ? HIGH : LOW);
+  digitalWrite(YELLOW, stYELLOW ? HIGH : LOW);
+  digitalWrite(YELLOW2, stYELLOW2 ? HIGH : LOW);
+  digitalWrite(GREEN, stGREEN ? HIGH : LOW);
+  digitalWrite(GREEN2, stGREEN2 ? HIGH : LOW);
+  digitalWrite(SOUND_FAST, stSFAST ? HIGH : LOW);
+  digitalWrite(SOUND_SLOW, stSSLOW ? HIGH : LOW);
 }
 
-void updateState(const String& header) {
-  setByKey(header, "red",        st.red);
-  setByKey(header, "red2",       st.red2);
-  setByKey(header, "yellow",     st.yellow);
-  setByKey(header, "yellow2",    st.yellow2);
-  setByKey(header, "green",      st.green);
-  setByKey(header, "green2",     st.green2);
-  setByKey(header, "sound_fast", st.sound_fast);
-  setByKey(header, "sound_slow", st.sound_slow);
+const char HTML_PAGE[] = R"HTML(
+<!DOCTYPE html><html lang="jp"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REMOTE-CONTROLLER</title>
+  <style>
+    body{font-family:sans-serif;background:#fff;max-width:520px;margin:0 auto;text-align:center;}
+    h1{color:#333;font-size:26px;margin:12px auto;}
+    .row{display:flex;justify-content:center;gap:10px;margin:10px 0;flex-wrap:wrap;}
+    .btn{height:56px;min-width:120px;color:#2c2b2b;background:#dddde9;font-size:16px;font-weight:bold;border-radius:10px;border:0;}
+    .title{min-width:120px;font-weight:bold}
+    table{margin:10px auto;border-collapse:collapse}
+    td{border:1px solid #999;padding:8px 10px}
+  </style></head><body>
+    <h1>patliteぴかぴか</h1>
 
-  if (header.indexOf("all=0") >= 0) {
-    st = State{}; 
-  }
-}
+    <div class="row"><div class="title">RED</div>
+      <button class="btn" onclick="send('red_on')">ON</button>
+      <button class="btn" onclick="send('red_off')">OFF</button>
+      <div id="st_red">?</div>
+    </div>
 
-String makeHtml() {
-  String html = R"HTML(
-<!doctype html><html lang="ja"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>patlite ぴかぴか</title>
-<style>
-  body{font-family:Helvetica;max-width:560px;margin:0 auto;text-align:center}
-  .card{border:1px solid #ccc;border-radius:10px;padding:10px;margin:12px}
-  .row{margin:10px 0}
-  a.btn{display:inline-block;min-width:120px;padding:12px 14px;margin:6px;
-        background:#1e88e5;color:#fff;text-decoration:none;border-radius:999px;font-weight:bold}
-  a.off{background:#616161}
-</style></head><body>
-<h3>KARAKURI-MUSHA</h3>
-<h3>- patlite ぴかぴか -</h3>
+    <div class="row"><div class="title">RED2</div>
+      <button class="btn" onclick="send('red2_on')">ON</button>
+      <button class="btn" onclick="send('red2_off')">OFF</button>
+      <div id="st_red2">?</div>
+    </div>
+
+    <div class="row"><div class="title">YELLOW</div>
+      <button class="btn" onclick="send('yellow_on')">ON</button>
+      <button class="btn" onclick="send('yellow_off')">OFF</button>
+      <div id="st_yellow">?</div>
+    </div>
+
+    <div class="row"><div class="title">YELLOW2</div>
+      <button class="btn" onclick="send('yellow2_on')">ON</button>
+      <button class="btn" onclick="send('yellow2_off')">OFF</button>
+      <div id="st_yellow2">?</div>
+    </div>
+
+    <div class="row"><div class="title">GREEN</div>
+      <button class="btn" onclick="send('green_on')">ON</button>
+      <button class="btn" onclick="send('green_off')">OFF</button>
+      <div id="st_green">?</div>
+    </div>
+
+    <div class="row"><div class="title">GREEN2</div>
+      <button class="btn" onclick="send('green2_on')">ON</button>
+      <button class="btn" onclick="send('green2_off')">OFF</button>
+      <div id="st_green2">?</div>
+    </div>
+
+    <div class="row"><div class="title">SOUND_FAST</div>
+      <button class="btn" onclick="send('sfast_on')">ON</button>
+      <button class="btn" onclick="send('sfast_off')">OFF</button>
+      <div id="st_sfast">?</div>
+    </div>
+
+    <div class="row"><div class="title">SOUND_SLOW</div>
+      <button class="btn" onclick="send('sslow_on')">ON</button>
+      <button class="btn" onclick="send('sslow_off')">OFF</button>
+      <div id="st_sslow">?</div>
+    </div>
+
+    <div class="row">
+      <button class="btn" onclick="send('all_off')">ALL OFF</button>
+    </div>
+
+    <table>
+      <tr><td>状態(まとめ)</td><td><pre id="all"></pre></td></tr>
+    </table>
+
+  <script type="text/javascript">
+    async function send(cmd){
+      try{ await fetch("/?cmd=" + cmd); }catch(e){ console.log(e); }
+    }
+
+    async function updateStatus(){
+      try{
+        const r = await fetch("/?cmd=status");
+        if(!r.ok) return;
+        const t = await r.text(); // 例: red=1&red2=0&...
+        document.getElementById("all").textContent = t;
+
+        document.getElementById("st_red").textContent     = t.includes("red=1") ? "ON" : "OFF";
+        document.getElementById("st_red2").textContent    = t.includes("red2=1") ? "ON" : "OFF";
+        document.getElementById("st_yellow").textContent  = t.includes("yellow=1") ? "ON" : "OFF";
+        document.getElementById("st_yellow2").textContent = t.includes("yellow2=1") ? "ON" : "OFF";
+        document.getElementById("st_green").textContent   = t.includes("green=1") ? "ON" : "OFF";
+        document.getElementById("st_green2").textContent  = t.includes("green2=1") ? "ON" : "OFF";
+        document.getElementById("st_sfast").textContent   = t.includes("sfast=1") ? "ON" : "OFF";
+        document.getElementById("st_sslow").textContent   = t.includes("sslow=1") ? "ON" : "OFF";
+      }catch(e){ console.log(e); }
+    }
+
+    setInterval(updateStatus, 1000);
+    updateStatus();
+  </script></body></html>
 )HTML";
 
-  html += "<div class='card'>";
-  html += "RED: " + String(onoff(st.red)) + " / RED2: " + String(onoff(st.red2)) + "<br>";
-  html += "YELLOW: " + String(onoff(st.yellow)) + " / YELLOW2: " + String(onoff(st.yellow2)) + "<br>";
-  html += "GREEN: " + String(onoff(st.green)) + " / GREEN2: " + String(onoff(st.green2)) + "<br>";
-  html += "SOUND_FAST: " + String(onoff(st.sound_fast)) + " / SOUND_SLOW: " + String(onoff(st.sound_slow)) + "<br>";
-  html += "</div>";
-
-  auto row = [&](const char* label, const char* key){
-    html += "<div class='row'><strong>";
-    html += label;
-    html += "</strong><br>";
-    html += "<a class='btn' href='/?";
-    html += key;
-    html += "=1'>ON</a>";
-    html += "<a class='btn off' href='/?";
-    html += key;
-    html += "=0'>OFF</a></div>";
-  };
-
-  row("RED", "red");
-  row("RED2", "red2");
-  row("YELLOW", "yellow");
-  row("YELLOW2", "yellow2");
-  row("GREEN", "green");
-  row("GREEN2", "green2");
-  row("SOUND_FAST", "sound_fast");
-  row("SOUND_SLOW", "sound_slow");
-
-  html += "<div class='row'><a class='btn off' href='/?all=0'>ALL OFF</a></div>";
-  html += "</body></html>";
-  return html;
-}
-
-void handleClientOnce() {
+void Run_WEB() {
   WiFiClient client = server.available();
   if (!client) return;
 
-  uint32_t start = millis();
-  String header;
-  String line;
+  CurrentTime = millis();
+  PreviousTime = CurrentTime;
 
-  while (client.connected() && (millis() - start) < TIMEOUT_MS) {
+  String currentLine = "";
+  Header = "";
+
+  while (client.connected() && CurrentTime - PreviousTime <= TIMEOUT_TIME) {
+    CurrentTime = millis();
     if (!client.available()) continue;
 
     char c = client.read();
-    header += c;
+    Header += c;
 
     if (c == '\n') {
-      if (line.length() == 0) break; // 空行＝ヘッダ終端
-      line = "";
+      if (currentLine.length() == 0) {
+        // ===== ここでコマンド判定（初心者向けにifを並べる） =====
+        if (Header.indexOf("GET /?cmd=red_on") >= 0)      stRED = true;
+        if (Header.indexOf("GET /?cmd=red_off") >= 0)     stRED = false;
+
+        if (Header.indexOf("GET /?cmd=red2_on") >= 0)     stRED2 = true;
+        if (Header.indexOf("GET /?cmd=red2_off") >= 0)    stRED2 = false;
+
+        if (Header.indexOf("GET /?cmd=yellow_on") >= 0)   stYELLOW = true;
+        if (Header.indexOf("GET /?cmd=yellow_off") >= 0)  stYELLOW = false;
+
+        if (Header.indexOf("GET /?cmd=yellow2_on") >= 0)  stYELLOW2 = true;
+        if (Header.indexOf("GET /?cmd=yellow2_off") >= 0) stYELLOW2 = false;
+
+        if (Header.indexOf("GET /?cmd=green_on") >= 0)    stGREEN = true;
+        if (Header.indexOf("GET /?cmd=green_off") >= 0)   stGREEN = false;
+
+        if (Header.indexOf("GET /?cmd=green2_on") >= 0)   stGREEN2 = true;
+        if (Header.indexOf("GET /?cmd=green2_off") >= 0)  stGREEN2 = false;
+
+        if (Header.indexOf("GET /?cmd=sfast_on") >= 0)    stSFAST = true;
+        if (Header.indexOf("GET /?cmd=sfast_off") >= 0)   stSFAST = false;
+
+        if (Header.indexOf("GET /?cmd=sslow_on") >= 0)    stSSLOW = true;
+        if (Header.indexOf("GET /?cmd=sslow_off") >= 0)   stSSLOW = false;
+
+        if (Header.indexOf("GET /?cmd=all_off") >= 0) {
+          stRED=stRED2=stYELLOW=stYELLOW2=stGREEN=stGREEN2=stSFAST=stSSLOW=false;
+        }
+
+        applyOutputs();
+        if (Header.indexOf("GET /?cmd=status") >= 0) {
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-type:text/plain; charset=utf-8");
+          client.println("Connection: close");
+          client.println();
+          client.printf("red=%d&red2=%d&yellow=%d&yellow2=%d&green=%d&green2=%d&sfast=%d&sslow=%d",
+                        stRED, stRED2, stYELLOW, stYELLOW2, stGREEN, stGREEN2, stSFAST, stSSLOW);
+          client.println();
+          client.println();
+          break;
+        }
+
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-type:text/html; charset=utf-8");
+        client.println("Connection: close");
+        client.println();
+        client.print(HTML_PAGE);
+        client.println();
+        break;
+      } else {
+        currentLine = "";
+      }
     } else if (c != '\r') {
-      line += c;
+      currentLine += c;
     }
   }
 
-  updateState(header);
-
-  // レスポンス
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-type:text/html; charset=utf-8");
-  client.println("Connection: close");
-  client.println();
-  client.print(makeHtml());
-  client.println();
-
+  Header = "";
+  client.flush();
   client.stop();
 }
+
 void setup() {
+  Serial.begin(9600);
+  delay(3000);
+
   pinMode(RED, OUTPUT);
   pinMode(RED2, OUTPUT);
   pinMode(YELLOW, OUTPUT);
@@ -171,27 +228,20 @@ void setup() {
   pinMode(SOUND_FAST, OUTPUT);
   pinMode(SOUND_SLOW, OUTPUT);
 
-  Serial.begin(115200);
-  delay(500);
+  applyOutputs(); // 全部OFF
 
-  //WiFi.mode(WIFI_STA);
+  Serial.printf("Connecting to '%s' \n", ssid);
   WiFi.begin(ssid, password);
-
-  Serial.print("Connecting");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
     Serial.print(".");
+    delay(100);
   }
-  Serial.println("\nConnected");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
+  Serial.printf("\nConnected to WiFi\nIP: %s\n",
+                WiFi.localIP().toString().c_str());
 
   server.begin();
-
-  httpState();
 }
 
 void loop() {
-  handleClientOnce();
-  httpState();
+  Run_WEB();
 }
